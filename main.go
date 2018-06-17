@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -12,6 +13,58 @@ import (
 	"github.com/urfave/cli"
 )
 
+// Listado de ficheros en el argumento
+var argsFiles []string
+
+func getFiles(args cli.Args) []string {
+	var files []string
+	pwd, _ := os.Getwd()
+	for i := 0; i < len(args); i++ {
+		filepaht := path.Join(pwd, args.Get(i))
+
+		if fileExists(filepaht) {
+			argsFiles = append(argsFiles, args.Get(i))
+			files = append(files, filepaht)
+		} else {
+			fs, err := filepath.Glob(filepaht)
+
+			if err == nil && len(fs) > 0 {
+				argsFiles = append(argsFiles, args.Get(i))
+				files = append(files, fs...)
+			}
+		}
+	}
+
+	return files
+}
+
+func getQualities(args cli.Args) []string {
+	var qualities []string
+	for i := 0; i < len(args); i++ {
+		is := false
+		for _, f := range argsFiles {
+			if f == args.Get(i) {
+				is = true
+				break
+			}
+		}
+
+		if !is {
+			qualities = append(qualities, args.Get(i))
+		}
+	}
+
+	return qualities
+}
+
+func fileExists(file string) bool {
+	if _, err := os.Stat(file); err == nil {
+		return true
+	}
+
+	return false
+}
+
 func main() {
 
 	app := cli.NewApp()
@@ -19,15 +72,26 @@ func main() {
 	app.Version = "0.0.1"
 	app.Email = "rubencidlara@gmail.com"
 	app.Author = "Rubén Cid Lara - @gnurub"
-	app.Usage = "Generate the images for the loading of images. Inspired by Medium"
+	app.Usage = "Generate th placeholder images for the loading of images. Inspired by Medium"
 	app.Action = func(c *cli.Context) error {
 
 		// Open the test image.
-		filename := c.Args().Get(0)
-
+		var files []string
 		if len(c.Args()) > 1 {
-			for i := 1; i < len(c.Args()); i++ {
-				param := strings.Split(c.Args().Get(i), ":")
+			files = getFiles(c.Args())
+		}
+
+		if len(files) == 0 {
+			fmt.Print("File not exists")
+			os.Exit(1)
+		}
+
+		var qualities = getQualities(c.Args())
+
+		if len(qualities) > 0 {
+			for i := 0; i < len(qualities); i++ {
+
+				param := strings.Split(qualities[i], ":")
 
 				quality, errQ := strconv.ParseInt(param[0], 10, 64)
 				blur, errB := strconv.ParseFloat(param[1], 64)
@@ -43,7 +107,7 @@ func main() {
 				}
 
 				if errQ != nil || errB != nil {
-					log.Fatalf("Format not correct <quality (int)>:<blur (float)>")
+					log.Fatalf("Format not correct <quality (int)>:<blur (float)>[:size]")
 				}
 
 				if quality > 100 {
@@ -58,11 +122,15 @@ func main() {
 					blur = 0
 				}
 
-				GenerateImage(filename, int(quality), float64(blur), int(width))
+				for _, file := range files {
+					GenerateImage(file, int(quality), float64(blur), int(width))
+				}
 			}
 		} else {
-			GenerateImage(filename, 30, 4, 100)
-			GenerateImage(filename, 70, 0, 0)
+			for _, file := range files {
+				GenerateImage(file, 30, 4, 100)
+				GenerateImage(file, 70, 0, 0)
+			}
 		}
 
 		return nil
@@ -72,12 +140,8 @@ func main() {
 }
 
 // Generates the optimized image
-func GenerateImage(filename string, quality int, blur float64, width int) {
-
-	pwd, _ := os.Getwd()
-
-	file := path.Join(pwd, filename)
-
+func GenerateImage(file string, quality int, blur float64, width int) {
+	dir, filename := path.Split(file)
 	extension := filepath.Ext(filename)
 	name := filename[0 : len(filename)-len(extension)]
 
@@ -97,7 +161,7 @@ func GenerateImage(filename string, quality int, blur float64, width int) {
 	src = imaging.Blur(src, blur)
 
 	// Save the resulting image using JPEG format.
-	err = imaging.Save(src, path.Join(pwd, finalName), imaging.JPEGQuality(quality))
+	err = imaging.Save(src, path.Join(dir, finalName), imaging.JPEGQuality(quality))
 	if err != nil {
 		log.Fatalf("Save failed: %v", err)
 	}

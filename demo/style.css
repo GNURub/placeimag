@@ -1,4 +1,4 @@
-img {
+img[data-src] {
     width: 300px;
     height: 200px;
     background: rgba(124, 124, 124, 0.342);
@@ -7,7 +7,7 @@ img {
     transition: opacity 1s linear;
 }
 
-img.loaded {
+img[data-src].loaded {
     opacity: 1;
 }
 
